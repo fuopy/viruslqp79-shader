@@ -3,6 +3,8 @@ Port of Virus LQP 79 to shader code
 
 # About
 Virus LQP-79 is a game made by TEAM a.r.g. in 2016 for the Arduino-based game system, Arduboy.
+The Arduboy is a nifty little 8-bit game handheld with a monochrome OLED. This repo is a part of a larger project which will bring several Arduboy games to VRChat!
+Check out the Arduboy at https://arduboy.com/
 
 # Original game
 The original code has been archived here. This is a snapshot of the most recent version of the code.
