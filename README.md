@@ -9,8 +9,8 @@ The original code has been archived here. This is a snapshot of the most recent 
 https://github.com/Team-ARG-Museum/ID-40-VIRUS-LQP-79
 
 # Usage
-1. Add the SuperbGame_VirusLQP79 directory of this repo to Assets/ in your Unity project.
-2. Drop the SuperbGame_VirusLQP79 prefab into your scene.
+1. Add the SuperbGame_VirusLQP directory of this repo to Assets/ in your Unity project.
+2. Drop the SuperbGame_VirusLQP prefab into your scene.
 3. Done!
 
 # Tips
