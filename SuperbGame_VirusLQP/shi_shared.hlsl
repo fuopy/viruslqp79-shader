@@ -167,6 +167,11 @@ int load_val(Texture2D tex, int2 pos)
 #define ROW_ENEMY_FLASHTIME 27
 #define ROW_ENEMY_TYPE 28
 
+#define ROW_INPUT_HISTORY 29
+#define ROW_FRAME_HISTORY 30
+#define ROW_INPUT_FUTURE 31
+#define ROW_FRAME_FUTURE 32
+
 #pragma endregion 
 
 #pragma region Superb_Singles
@@ -185,6 +190,7 @@ static const int2 SINGLE_Superb_old_down = {42, ROW_SINGLE};
 static const int2 SINGLE_Superb_old_right = {43, ROW_SINGLE};
 static const int2 SINGLE_Superb_new_power = {44, ROW_SINGLE};
 static const int2 SINGLE_Superb_old_power = {45, ROW_SINGLE};
+static const int2 SINGLE_Superb_frameNumber = {46, ROW_SINGLE};
 #pragma endregion
 
 
@@ -204,39 +210,9 @@ static bool old_down;
 static bool old_right;
 static bool new_power;
 static bool old_power;
+static int frameNumber;
 #pragma endregion
 
-#pragma region Superb_Methods
-void updateInput(float inputState)
-{
-	int iState = inputState;
-
-	old_a = new_a;
-	old_b = new_b;
-	old_left = new_left;
-	old_right = new_right;
-	old_up = new_up;
-	old_down = new_down;
-	old_power = new_power;
-
-	new_a = iState & 1;
-	new_b = iState & 2;
-	new_left = iState & 4;
-	new_right = iState & 8;
-	new_up = iState & 16;
-	new_down = iState & 32;
-	new_power = iState & 64;
-}
-void tautInput()
-{
-	new_a = true;
-	new_b = true;
-	new_up = true;
-	new_down = true;
-	new_left = true;
-	new_right = true;
-}
-#pragma endregion
 
 #pragma region LQP_Constants
 
@@ -398,6 +374,9 @@ static const int2 nextlevel_uv_base = {0, 224};
 #define ZOMBIE_STEP_DELAY        3
 #define ZOMBIE_FLASH_TIME        5
 
+#define INPUT_HISTORY_MAX        64
+#define INPUT_FUTURE_MAX         64
+
 // Lookup table for trig.
 static const int BulletXVelocities[8] = { 0, -2, -3, -2, 0, 2, 3, 2 };
 
@@ -416,6 +395,8 @@ static const int pickupsAvailable[] = {
 };
 
 #pragma endregion
+
+
 
 #pragma region LQP_Funcs
 // burp
@@ -747,6 +728,88 @@ static Element survivors[SURVIVOR_MAX];
 static Door exitDoor;
 static Enemy zombies[ZOMBIE_MAX];
 static Player coolGirl;
+static float inputhistory[INPUT_HISTORY_MAX];
+static float framehistory[INPUT_HISTORY_MAX];
+static float inputfuture[INPUT_FUTURE_MAX]; // The future buffer: Input
+static float framefuture[INPUT_FUTURE_MAX]; // The future buffer: Frame number.
+
+#pragma endregion
+
+#pragma region Superb_Methods
+void updateInput(float inputState)
+{
+	int iState = inputState;
+
+	// Copy new to old and unmask new.
+	old_a = new_a;
+	old_b = new_b;
+	old_left = new_left;
+	old_right = new_right;
+	old_up = new_up;
+	old_down = new_down;
+	old_power = new_power;
+	new_a = iState & 1;
+	new_b = iState & 2;
+	new_left = iState & 4;
+	new_right = iState & 8;
+	new_up = iState & 16;
+	new_down = iState & 32;
+	new_power = iState & 64;
+
+	// Copy input state and frame history. Oldest stuff is at the top. Everything else copies up.
+	[unroll] for (int i = 0; i < INPUT_HISTORY_MAX-1; ++i)
+	{
+		inputhistory[i] = inputhistory[i+1];
+		framehistory[i] = framehistory[i+1];
+	}
+	inputhistory[INPUT_HISTORY_MAX-1] = iState;
+	framehistory[INPUT_HISTORY_MAX-1] = sharedState.frameCounter;
+}
+
+// Returns true if we have buttons to simulate.
+// Returns false if the button is empty--This means the sim should pause.
+bool simulateInput(float frameHist[INPUT_HISTORY_MAX], float inputHist[INPUT_HISTORY_MAX])
+{
+	// Copy to the history buffers. (for now. add a latch to only copy sometimes/append later on.)
+	for (int frameIter = 0; frameIter < INPUT_HISTORY_MAX; ++frameIter)
+	{
+		inputfuture[frameIter] = inputHist[frameIter];
+		framefuture[frameIter] = frameHist[frameIter];
+	}
+
+	// If our current frame number is ahead of anything in the future buffer, we've
+	// gone to far somehow. Pause and wait for inputs.
+	if (sharedState.frameCounter >= framefuture[0])
+	{
+		return false;
+	}
+
+	// Otherwise let's pop a frame input. The top one becomes the new input. Move everything upwards.
+	int iState = inputfuture[INPUT_FUTURE_MAX-1];
+	[unroll] for (int i = 0; i < INPUT_FUTURE_MAX-1; ++i)
+	{
+		inputfuture[i] = inputfuture[i+1];
+		framefuture[i] = framefuture[i+1];
+	}
+
+	// Copy new to old and unmask new.
+	old_a = new_a;
+	old_b = new_b;
+	old_left = new_left;
+	old_right = new_right;
+	old_up = new_up;
+	old_down = new_down;
+	old_power = new_power;
+	new_a = iState & 1;
+	new_b = iState & 2;
+	new_left = iState & 4;
+	new_right = iState & 8;
+	new_up = iState & 16;
+	new_down = iState & 32;
+	new_power = iState & 64;
+
+	return true;
+}
 
 #pragma endregion
 
@@ -786,12 +849,13 @@ void load_state_superb(Texture2D tex)
 	old_right = load_val(tex, SINGLE_Superb_old_right);
 	new_power = load_val(tex, SINGLE_Superb_new_power);
 	old_power = load_val(tex, SINGLE_Superb_old_power);
+	frameNumber = load_val(tex, SINGLE_Superb_frameNumber);
 }
 
 void load_state(Texture2D tex)
 {
     // Load all memory values.
-	int id1, id2, id3, id4;
+	int id1, id2, id3, id4, id5, id6;
 
 	deltaTimeBuffer = load_float(tex, SINGLE_Superb_deltaTimeBuffer);
 	new_a = load_val(tex, SINGLE_Superb_new_a);
@@ -808,6 +872,7 @@ void load_state(Texture2D tex)
 	old_right = load_val(tex, SINGLE_Superb_old_right);	
 	new_power = load_val(tex, SINGLE_Superb_new_power);	
 	old_power = load_val(tex, SINGLE_Superb_old_power);	
+	frameNumber = load_val(tex, SINGLE_Superb_frameNumber);
 
 	sharedState.gameID = load_val(tex, SINGLE_SharedState_gameID);
 	sharedState.gameState = load_val(tex, SINGLE_SharedState_gameState);
@@ -893,6 +958,18 @@ void load_state(Texture2D tex)
 		pickups[id4].counter = load_val(tex, int2(id4, ROW_PICKUP_COUNTER));
 		pickups[id4].isVisible = load_val(tex, int2(id4, ROW_PICKUP_ISVISIBLE));
 	}
+
+	for (id5 = 0; id5 < INPUT_HISTORY_MAX; ++id5)
+	{
+		inputhistory[id5] = load_float(tex, int2(id5, ROW_INPUT_HISTORY));
+		framehistory[id5] = load_float(tex, int2(id5, ROW_FRAME_HISTORY));
+	}
+
+	for (id6 = 0; id6 < INPUT_FUTURE_MAX; ++id6)
+	{
+		inputfuture[id6] = load_float(tex, int2(id6, ROW_INPUT_FUTURE));
+		framefuture[id6] = load_float(tex, int2(id6, ROW_FRAME_FUTURE));
+	}
 }
 #pragma endregion 
 
@@ -916,6 +993,7 @@ float4 save_Single(int x)
     case 43: return SAVE_BOOL(old_right);
     case 44: return SAVE_BOOL(new_power);
     case 45: return SAVE_BOOL(old_power);
+    case 46: return pack_it(frameNumber);
     
     default: return nullFloat4;
     }
@@ -1018,6 +1096,10 @@ float4 save_state(int x, int y)
     case ROW_ENEMY_ACTIVE: return MAXER(x, ZOMBIE_MAX, zombies[x].active);
     case ROW_ENEMY_FLASHTIME: return MAXER(x, ZOMBIE_MAX, zombies[x].flashTime);
     case ROW_ENEMY_TYPE: return MAXER(x, ZOMBIE_MAX, zombies[x].type);
+	case ROW_INPUT_HISTORY: return MAXER(x, INPUT_HISTORY_MAX, inputhistory[x]);
+	case ROW_FRAME_HISTORY: return MAXER(x, INPUT_HISTORY_MAX, framehistory[x]);
+	case ROW_INPUT_FUTURE: return MAXER(x, INPUT_FUTURE_MAX, inputfuture[x]);
+	case ROW_FRAME_FUTURE: return MAXER(x, INPUT_FUTURE_MAX, framefuture[x]);
 
     default: return nullFloat4;
     }

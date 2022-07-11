@@ -23,6 +23,8 @@ Shader "SuperbGame_VirusLQP/sh_logic"
     {
         _LogicCanvas("LogicCanvas", 2D) = "gray" {}
 		_PlayerOneJoystick("PlayerOneJoystick", Float) = 0
+		_IsLocalPlayerOwner("IsLocalPlayerOwner", Float) = 0
+		_Reset("Reset", Float) = 0
 	}
 	SubShader
 	{
@@ -38,6 +40,10 @@ Shader "SuperbGame_VirusLQP/sh_logic"
 
 			uniform Texture2D _LogicCanvas; // Read, Write.
 			uniform float _PlayerOneJoystick;
+			uniform float _IsLocalPlayerOwner;
+			uniform float _Reset;
+			uniform float _Recv_FrameHistory[64];
+			uniform float _Recv_InputHistory[64];
 
 			void runGameLogic()
 			{
@@ -65,6 +71,8 @@ Shader "SuperbGame_VirusLQP/sh_logic"
 
 			float4 frag(v2f_customrendertexture IN) : COLOR
 			{
+				if (_Reset) return float4(0, 0, 0, 0);
+				
 				static const float IMAGE_WIDTH = 128.0;
 				static const float IMAGE_HEIGHT = 128.0;
 				int x = floor(IN.localTexcoord[0] * IMAGE_WIDTH);
@@ -82,9 +90,24 @@ Shader "SuperbGame_VirusLQP/sh_logic"
 					deltaTimeBuffer -= 0.0167;
 					--maxFrameSkip;
 
-					updateInput(_PlayerOneJoystick);
-					++sharedState.frameCounter;
-					[call] runGameLogic();
+					// If we're running the game, progress like normal.
+					if (_IsLocalPlayerOwner > 0.5)
+					{
+						[call] updateInput(_PlayerOneJoystick);
+						++sharedState.frameCounter;
+						//[call] runGameLogic();
+					}
+					// If we're playing a movie, progress while we have data to read.
+					else
+					{
+						bool shouldRunSimulation = simulateInput(_Recv_FrameHistory, _Recv_InputHistory);
+
+						if (shouldRunSimulation)
+						{
+							++sharedState.frameCounter;
+							//[call] runGameLogic();
+						}
+					}
 				}
 
 				if (POWER_DOWN)

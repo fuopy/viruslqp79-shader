@@ -1,12 +1,12 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!86 &8600000
-CustomRenderTexture:
+--- !u!84 &8400000
+RenderTexture:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: crt_logic
+  m_Name: aaa
   m_ImageContentsHash:
     serializedVersion: 2
     Hash: 00000000000000000000000000000000
@@ -28,25 +28,10 @@ CustomRenderTexture:
   m_TextureSettings:
     serializedVersion: 2
     m_FilterMode: 0
-    m_Aniso: 1
+    m_Aniso: 0
     m_MipBias: 0
     m_WrapU: 1
     m_WrapV: 1
     m_WrapW: 1
   m_Dimension: 2
   m_VolumeDepth: 1
-  m_Material: {fileID: 2100000, guid: b75cc2e772bc9cf4b8a5bfdcdc1bc2f8, type: 2}
-  m_InitSource: 0
-  m_InitMaterial: {fileID: 0}
-  m_InitColor: {r: 0, g: 0, b: 0, a: 0}
-  m_InitTexture: {fileID: 0}
-  m_UpdateMode: 1
-  m_InitializationMode: 0
-  m_UpdateZoneSpace: 0
-  m_CurrentUpdateZoneSpace: 0
-  m_UpdateZones: []
-  m_UpdatePeriod: 0
-  m_ShaderPass: 0
-  m_CubemapFaceMask: 4294967295
-  m_DoubleBuffered: 1
-  m_WrapUpdateZones: 0
